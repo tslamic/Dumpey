@@ -8,8 +8,8 @@ Android - or, more precisely, its debug bridge -  has a very handy tool called _
 Dumpey is, currently, a collection of three *UNIX* scripts:
 
  - `monkey` capable of running the monkey on all attached devices/emulators
- - `memdmp` capable of dumping a converted heap memory from a specific device/emulator to a local drive
- - `dumpey` capable of dumping the heap before and after running the monkey on all attached devices/emulators
+ - `memdmp` capable of extracting and converting heap dumps from a device/emulator to a local drive
+ - `dumpey` capable of extracting and converting heap dumps before and after running the monkey, on all attached devices/emulators
 
 ### monkey
 
@@ -42,7 +42,7 @@ Three options, all required:
 An example:
 
 ```
-$ ./memdmp.sh -s SH48HWM03500 -p your.package.name -s 12345 -f heapdumps/my_heap_dump.hprof
+$ ./memdmp.sh -s SH48HWM03500 -p your.package.name -f heapdumps/my_heap_dump.hprof
 ```
 
 ### dumpey
