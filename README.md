@@ -5,11 +5,11 @@ Android - or, more precisely, its debug bridge -  has a very handy tool called _
 - run the monkey on multiple devices or emulators and
 - make converted memory heap dumps before and after it
 
-Dumpey is (currently) a collection of three scripts:
+Dumpey is, currently, a collection of three *UNIX* scripts:
 
  - `monkey` capable of running the monkey on all attached devices/emulators
- - `memdmp` capable of dumping a converted heap memory from a device/emulator to a local drive
- - `dumpey` combines the above scripts; it dumps the heap before and after it runs the monkey
+ - `memdmp` capable of dumping a converted heap memory from a specific device/emulator to a local drive
+ - `dumpey` capable of dumping the heap before and after running the monkey on all attached devices/emulators
 
 ### monkey
 
@@ -22,13 +22,13 @@ Three options: `p`, `s` and `e`:
 Running it is as simple as:
 
 ```
-$ ./monkey -p your.package.name
+$ ./monkey.sh -p your.package.name
 ```
 
 or as complicated as 
 
 ```
-$ ./monkey -p your.package.name -s 12345 -e 5000
+$ ./monkey.sh -p your.package.name -s 12345 -e 5000
 ```
 
 ### memdmp
@@ -42,7 +42,7 @@ Three options, all required:
 An example:
 
 ```
-$ ./memdmp -s SH48HWM03500 -p your.package.name -s 12345 -f heapdumps/my_heap_dump.hprof
+$ ./memdmp.sh -s SH48HWM03500 -p your.package.name -s 12345 -f heapdumps/my_heap_dump.hprof
 ```
 
 ### dumpey
@@ -56,16 +56,18 @@ $ ./memdmp -s SH48HWM03500 -p your.package.name -s 12345 -f heapdumps/my_heap_du
  - `-a` will triger memory dumps after the monkey.
  - `-d` denotes the directory where dumps will be put. Required if either `b` or `a` (or both) is set.
 
-Usage remains simple. To do no memory dumps whatsoever (and to behave exactly the same as the _monkey_ script), do:
+Also, it expects the _memdmp_ script to be in the same directory. 
+
+Usage remains simple. To do no memory dumps whatsoever and to behave exactly the same as the _monkey_ script, do:
 
 ```
-$ ./dumpey -p your.package.name
+$ ./dumpey.sh -p your.package.name
 ```
 
 To add memory dumps before doing the monkey, do:
 
 ```
-$ ./dumpey -p your.package.name -b -d heapdumps/
+$ ./dumpey.sh -p your.package.name -b -d heapdumps/
 ```
 
 The converted memory dump will be put in the `heapdumps` directory. If, for example, one of your attached devices is `SH48HWM03500`, the memory dump file from it will be named `SH48HWM03500-before.hprof`. 
@@ -73,7 +75,7 @@ The converted memory dump will be put in the `heapdumps` directory. If, for exam
 To only do memory dumps after the monkey, change `-b` to `-a`:
 
 ```
-$ ./dumpey -p your.package.name -a -d heapdumps/
+$ ./dumpey.sh -p your.package.name -a -d heapdumps/
 ```
 
 As you can imagine, the output file will be named `SH48HWM03500-after.hprof`, and will reside in the `heapdumps` directory.
@@ -81,29 +83,29 @@ As you can imagine, the output file will be named `SH48HWM03500-after.hprof`, an
 Finally, to do dumps before and after, and to shorten the syntax, do:
 
 ```
-$ ./dumpey -p your.package.name -bad heapdumps/
+$ ./dumpey.sh -p your.package.name -bad heapdumps/
 ```
 
 ### License
 
-The MIT License (MIT)
-
-Copyright (c) 2015 Tadej Slamic
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+	The MIT License (MIT)
+	
+	Copyright (c) 2015 Tadej Slamic
+	
+	Permission is hereby granted, free of charge, to any person obtaining a copy
+	of this software and associated documentation files (the "Software"), to deal
+	in the Software without restriction, including without limitation the rights
+	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+	copies of the Software, and to permit persons to whom the Software is
+	furnished to do so, subject to the following conditions:
+	
+	The above copyright notice and this permission notice shall be included in all
+	copies or substantial portions of the Software.
+	
+	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+	SOFTWARE.
