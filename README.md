@@ -1,6 +1,6 @@
 # Dumpey
 
-Android - or, more precisely, its debug bridge -  has a very handy tool called _the monkey_. It’s purpose is to stress-test your app by generating pseudo-random user events in a repeatable manner. Sometimes, it's a bit clunky to use, or its usage unclear. Dumpey helps you to
+Android - or, more precisely, its debug bridge -  has a very handy tool called _the monkey_. Its purpose is to stress-test your app by generating pseudo-random user events in a repeatable manner. Sometimes, the usage is a bit clunky or unclear. Dumpey helps you
 
 - run the monkey on multiple devices or emulators and
 - make converted memory heap dumps before and after it
@@ -44,6 +44,8 @@ An example:
 ```
 $ ./memdmp.sh -s SH48HWM03500 -p your.package.name -f heapdumps/my_heap_dump.hprof
 ```
+
+This will extract a converted memory heap dump to `heapdumps/my_heap_dump.hprof` file. All you have to do is open it with MAT.
 
 ### dumpey
 
