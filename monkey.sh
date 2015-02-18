@@ -5,7 +5,7 @@
 
 SEED=$RANDOM
 EVENTS=1000
-PACKAGE=""
+PACKAGE=
 
 usage() {
     echo "Usage: -p <package> [-s <integer>] [-e <integer>]"
@@ -16,7 +16,7 @@ exec_monkey() {
     local devices=($(adb devices | awk 'NF && NR>1 {print $1}'))
     for device in "${devices[@]}"
     do
-        adb -s "$device" shell monkey -p $PACKAGE -s $SEED $EVENTS
+        adb -s "$device" shell monkey -p "$PACKAGE" -s $SEED $EVENTS
     done
 }
 
@@ -29,8 +29,8 @@ while getopts ":p:s:e:" opt; do
     esac
 done
 
-if [ -z "${PACKAGE}" ]; then
-    usage
-else 
+if [ "${PACKAGE}" ]; then
     exec_monkey
+else 
+    usage
 fi
