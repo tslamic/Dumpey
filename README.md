@@ -17,7 +17,7 @@ Three options: `p`, `s` and `e`:
 
  - `-p` denotes the package name and is *required*.
  - `-s` is the seed value. If missing, a random generated number will be used instead. 
- - `-e` is the number of events you wish to generate. It defaults to 10000.
+ - `-e` is the number of events you wish to generate. It defaults to 1000.
 
 Running it is as simple as:
 
