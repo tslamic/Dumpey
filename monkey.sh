@@ -1,7 +1,9 @@
 #!/bin/bash
 #
 # Runs the monkey on all devices/emulators detected by "adb devices"
-# Assumes the appropriate tools (adb, hprof-conv) are included in the path.
+# Assumes the appropriate tools, such as adb, are included in the path.
+#
+# Released under the MIT License (MIT), copyright (c) 2015 Tadej Slamic.
 
 SEED=$RANDOM
 EVENTS=1000
