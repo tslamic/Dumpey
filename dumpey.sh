@@ -53,7 +53,7 @@ exec_monkey() {
 exec() {
     if [ $BEFORE = true ] || [ $AFTER = true ]; then
         if [ -z "$DIR" ]; then
-            err "Directory path missing."
+            err "Directory path option missing: -d <dir>"
         fi
     fi
     exec_monkey
