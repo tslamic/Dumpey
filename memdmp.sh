@@ -2,10 +2,14 @@
 #
 # Dumps the memory from a device/emulator.
 # Assumes the appropriate tools (adb, hprof-conv) are included in the path.
+#
+# Released under the MIT License (MIT), copyright (c) 2015 Tadej Slamic.
 
-SERIAL=""
-PACKAGE=""
-FILE=""
+readonly TMP_SDCARD_HPROF_PATH="/sdcard/hprof___tmp"
+
+SERIAL=
+PACKAGE=
+FILE=
 
 usage() {
     echo "Usage: -s <serialNumber> -p <package> -f <file>"
@@ -23,7 +27,7 @@ create_file() {
     
     mkdir -p -- "$dir" && touch -- "$file"  
     
-    if [ ! -e "$file" ]; then 
+    if [ ! -f "$file" ]; then 
         err "File $file could not be created."
     fi
 }
@@ -38,25 +42,24 @@ dump_heap() {
     local file="$2"
     local dir=$(dirname "$file")
 
-    # Remove any existing tmp files we created. Ideally, there should be none.
-    local exists=$(adb -s "$SERIAL" shell ls "$dir" | grep "$file")
-    if [ -n "$exists" ]; then
+    # If the tmp file already exists, remove it.
+    if [ -f "$file" ]; then
         adb -s "$SERIAL" shell rm "$file"
     fi
-    
+
     echo -n "Dumping heap "
     
     # Dump the heap to a tmp file on a device/emulator
     adb -s "$SERIAL" shell am dumpheap "$pid" "$file"
     
     # Beacuse the previous cmd runs as a daemon, we have to wait for it to 
-    # finish. The following checks the tmp file size continuously, stopping
+    # finish: check the tmp file size continuously and stop
     # when it's not changing anymore.  
-    sleepinterval=0.5
+    local sleepinterval=0.5
     
-    s0=-1
+    local s0=-1
     sleep $sleepinterval
-    s1=$(file_size_on_device "$file")
+    local s1=$(file_size_on_device "$file")
     
     while ((s1 > s0))
     do 
@@ -69,37 +72,46 @@ dump_heap() {
     echo " Done"
 }
 
-extract_from_device() {         
-    local pid=$(adb -s "$SERIAL" shell ps | grep $PACKAGE | awk '{print $2}')
+extract_from_device() {
+    local pid=$(adb -s "$SERIAL" shell ps | awk -v p="$PACKAGE" '$9 ~ p {print $2}')
     if [ -z "${pid}" ]; then
         err "PID for $PACKAGE not found. Is your app installed and running?"
     fi
     
     # Dump heap to tmp file on a device
-    local file="/sdcard/hprof___tmp"
+    local file="$TMP_SDCARD_HPROF_PATH"
     dump_heap "$pid" "$file"
     
     # Extract
     local tmp="$FILE-nonconv"       
-    create_file $tmp
-    adb -s "$SERIAL" pull -p $file $tmp
+    create_file "$tmp"
+    adb -s "$SERIAL" pull -p "$file" "$tmp"
     
     # Convert
     if [ -s "$tmp" ]; then
-        create_file $FILE       
-        hprof-conv $tmp $FILE
+        create_file "$FILE"       
+        hprof-conv "$tmp" "$FILE"
     else
         echo "No data to convert."
     fi
     
     # Finish
     adb -s "$SERIAL" shell rm "$file"
-    rm -- $tmp
+    rm -- "$tmp"
     
     echo "Done, converted heap extracted to $FILE"
 }
 
-while getopts ":s::p::f:" opt; do
+exec() {
+    local version=$(adb -s "$SERIAL" shell getprop ro.build.version.sdk | tr -d '\r')
+    if [ "$version" -gt "10" ]; then
+        extract_from_device
+    else 
+        err "The target device/emulator must be API 11 or above."
+    fi
+}
+
+while getopts ":s:p:f:" opt; do
     case $opt in
         s) SERIAL="$OPTARG";;
         p) PACKAGE="$OPTARG";;
@@ -108,13 +120,8 @@ while getopts ":s::p::f:" opt; do
     esac
 done
 
-if [ -z "${SERIAL}" ] || [ -z "${PACKAGE}" ] || [ -z "${FILE}" ]; then
-    usage
+if [ "$SERIAL" -a "$PACKAGE" -a "$FILE" ]; then
+    exec
 else 
-    version=$(adb -s "$SERIAL" shell getprop ro.build.version.sdk | tr -d '\r')
-    if [ "$version" -gt "10" ]; then
-        extract_from_device
-    else 
-        err "The target device/emulator must be API 11 or above."
-    fi
+    usage
 fi

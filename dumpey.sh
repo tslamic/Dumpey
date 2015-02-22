@@ -2,15 +2,16 @@
 #
 # Runs the monkey on all devices/emulators detected by "adb devices" and dumps
 # the heap before, after, of both, if specified.
-#
 # Assumes the appropriate tools (adb, hprof-conv) are included in the path.
+#
+# Released under the MIT License (MIT), copyright (c) 2015 Tadej Slamic.
 
 SEED=$RANDOM
 EVENTS=500
-PACKAGE=""
+PACKAGE=
 BEFORE=false
 AFTER=false
-DIR=""
+DIR=
 
 usage() {
     echo "Usage: -p <package> [-s <integer>] [-e <integer>] [-b] [-a] [-d <dir>]"
@@ -44,9 +45,18 @@ exec_monkey() {
     for device in "${devices[@]}"
     do
         if [ $BEFORE = true ]; then dump_heap $device "before"; fi
-        adb -s $device shell monkey -p $PACKAGE -s $SEED $EVENTS
+        adb -s $device shell monkey -p "$PACKAGE" -s $SEED $EVENTS
         if [ $AFTER = true ]; then dump_heap $device "after"; fi
     done
+}
+
+exec() {
+    if [ $BEFORE = true ] || [ $AFTER = true ]; then
+        if [ -z "$DIR" ]; then
+            err "Directory path missing."
+        fi
+    fi
+    exec_monkey
 }
 
 while getopts ":p:s:e:bad:" opt; do
@@ -61,13 +71,8 @@ while getopts ":p:s:e:bad:" opt; do
     esac
 done
 
-if [ -z "${PACKAGE}" ]; then
-    usage
+if [ "${PACKAGE}" ]; then
+    exec
 else 
-    if [ $BEFORE = true ] || [ $AFTER = true ]; then
-        if [ -z "$DIR" ]; then
-            err "Directory path missing."
-        fi
-    fi
-    exec_monkey
+    usage
 fi
