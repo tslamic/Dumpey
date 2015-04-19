@@ -16,15 +16,6 @@ class TestStringMethods(unittest.TestCase):
         t = ''
         self.assertEqual(du._decor_package(t), [])
 
-    def test_hprof_name(self):
-        d = "123test321"
-
-        s = 'test'
-        self.assertEqual(du._hprof_file_name(s, d), 'test_123test321.hprof')
-
-        s = 'test.hprof'
-        self.assertEqual(du._hprof_file_name(s, d), 'test_123test321.hprof')
-
     def test_isupper(self):
         self.assertTrue('FOO'.isupper())
         self.assertFalse('Foo'.isupper())

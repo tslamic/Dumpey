@@ -4,15 +4,12 @@ Dumpey
 
 __version__ = '1.0'
 
-import subprocess as spc
 import os
 import re
 import time
-from random import randint
+import subprocess
 import argparse
-
-
-# Actions
+from random import randint
 
 
 def install(apk_path, devices):
@@ -49,13 +46,14 @@ def pull_apk(package, local_dir, devices):
 
 def pull_apk_from_path(remote, local_dir, device):
     """ Downloads the apk from a given remote path. """
-    name = _device_safe_name(device) + '_' + os.path.basename(remote)
+    name = _alphanum_str(device) + '_' + os.path.basename(remote)
     local_file = os.path.join(local_dir, name)
     adb(['pull', '-p', remote, local_file], device)
     _fancy_info('Apk from %s downloaded to %s', device, local_file)
 
 
-def monkey(package, devices, seed=None, events=None, before=None, after=None):
+def monkey(package, devices,
+           seed=None, events=None, before=None, after=None, log=True):
     """ Runs the monkey stress test. """
     if not devices:
         devices = attached_devices()
@@ -66,26 +64,27 @@ def monkey(package, devices, seed=None, events=None, before=None, after=None):
     for device in devices:
         if before:
             before(package, device)
-        _fancy_info('Kicking off monkey (seed=%d, events=%d) on %s '
-                    'for package %s', seed, events, device, package)
+        if log:
+            _fancy_info('Kicking off monkey (seed=%d, events=%d) on %s '
+                        'for package %s', seed, events, device, package)
         adb(['shell', 'monkey', '-p', package, '-s', str(seed), str(events)],
             device)
         if after:
             after(package, device)
 
 
-def dump_heap(package, local_file, devices):
+def dump_heap(package, local_dir, devices):
     """ Creates and downloads a heap dump of a given package. """
     if not devices:
         devices = attached_devices()
     for device in devices:
-        dump_heap_on_single_device(package, local_file, device)
+        dump_heap_on_single_device(package, local_dir, device)
 
 
-REMOTE_HEAP_DUMP_PATH = '/sdcard/_dumpey_hprof_tmp'
+_REMOTE_HEAP_DUMP_PATH = '/sdcard/_dumpey_hprof_tmp'
 
 
-def dump_heap_on_single_device(package, local_file, device):
+def dump_heap_on_single_device(package, local_dir, device, append=None):
     """ Creates and downloads a heap dump of a given package. """
     if device is None:
         raise Exception('no device')
@@ -95,7 +94,7 @@ def dump_heap_on_single_device(package, local_file, device):
                        'Device %s is %d' % device, api)
         return
     pid_num = pid(package, device)
-    remote = REMOTE_HEAP_DUMP_PATH
+    remote = _REMOTE_HEAP_DUMP_PATH
     adb(['shell', 'rm', '-f', remote], device)
     adb(['shell', 'am', 'dumpheap', str(pid_num), remote], device)
 
@@ -110,12 +109,15 @@ def dump_heap_on_single_device(package, local_file, device):
             break
         size = temp
 
-    local_file_dump = local_file + '-nonconv'
-    adb(['pull', '-p', remote, local_file_dump], device)
-    local_file_dump_abs = os.path.abspath(local_file_dump)
-    local_file_abs = os.path.abspath(_hprof_file_name(local_file, device))
-    spc.check_call(['hprof-conv', local_file_dump_abs, local_file_abs])
-    os.remove(local_file_dump_abs)
+    name = _alphanum_str(device) + '_' + _alphanum_str(package)
+    if append:
+        name += '_' + append
+    local_file = os.path.join(local_dir, name + '.hprof')
+    local_file_nonconv = local_file + '-nonconv'
+    adb(['pull', '-p', remote, local_file_nonconv], device)
+    subprocess.check_call(['hprof-conv', local_file_nonconv, local_file])
+    os.remove(local_file_nonconv)
+    _fancy_info('Converted hprof file downloaded to %s', local_file)
 
 
 # Helpers
@@ -125,7 +127,7 @@ def adb(args, device=None, decor=None):
     """ Executes an adb command. """
     head = ['adb', '-s', device] if device else ['adb']
     command = head + args
-    process = spc.Popen(command, stdout=spc.PIPE)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE)
     output, err = process.communicate()
     exit_val = process.poll()
     if exit_val:
@@ -161,13 +163,22 @@ def package_list_on_single_device(regex, device):
     return [p for p in packages if regex.search(p)] if regex else packages
 
 
-def pid(package, device):
+_MAX_PID_RETRIES = 3
+
+
+def pid(package, device, retries=0):
     """ Returns the package process ID on a specified device. """
     out = adb(['shell', 'ps'], device, _decor_split)
     processes = [p.strip() for p in out if package in p]
     if not processes:
-        raise Exception('No process found for %s. '
-                        'Is your app running?' % package)
+        # The app might be installed, but is not running.
+        # To avoid manual start, try to run the monkey with a single event,
+        # then re-query.
+        if retries >= _MAX_PID_RETRIES:
+            raise Exception('No process on %s found for %s. '
+                            'Is your app installed?' % (device, package))
+        monkey(package, [device], seed=0, events=1, log=False)
+        return pid(package, device, retries + 1)
     if len(processes) > 1:
         raise Exception('Multiple processes for %s: %s.'
                         % package, _to_str(processes))
@@ -187,11 +198,13 @@ def _file_size(file_path, device):
 
 
 def _decor_split(output, cleanup=None):
+    """ Splits the output into lines and performs per-line cleanup. """
     splits = output.split('\n')
     return [cleanup(s) if cleanup else s.strip() for s in splits if s.strip()]
 
 
 def _decor_package(output):
+    """ Splits the output into lines and removes package: delimiter """
     return _decor_split(output, lambda l: l.strip().split('package:')[1])
 
 
@@ -199,68 +212,128 @@ def _split_whitespace(string):
     return re.sub(' +', ' ', string).split(' ')
 
 
-def _device_safe_name(device):
-    return re.sub(r'\W+', '_', device)
-
-
-def _hprof_file_name(local_file, device):
-    hprof = '.hprof'
-    if local_file.endswith(hprof):
-        local_file = local_file[:-len(hprof)]
-    return local_file + '_' + _device_safe_name(device) + hprof
+def _alphanum_str(string):
+    return re.sub(r'\W+', '_', string)
 
 
 def _to_str(lst, delimiter=', '):
+    """ Creates a user-friendly list string. """
     return delimiter.join(lst)
 
 
-SHELL_COLOR_LT_BLUE = '\033[94m'
-SHELL_COLOR_WARNING = '\033[93m'
-SHELL_COLOR_END = '\033[0m'
+_SHELL_COLOR_LT_BLUE = '\033[94m'
+_SHELL_COLOR_WARNING = '\033[93m'
+_SHELL_COLOR_END = '\033[0m'
 
 
 def _fancy_print(shell_color, string_format, *string_args):
+    """ Prints a colored message. """
     message = string_format % string_args
-    print shell_color + message + SHELL_COLOR_END
+    print shell_color + message + _SHELL_COLOR_END
 
 
 def _fancy_warning(string_format, *string_args):
-    _fancy_print(SHELL_COLOR_WARNING, string_format, *string_args)
+    _fancy_print(_SHELL_COLOR_WARNING, string_format, *string_args)
 
 
 def _fancy_info(string_format, *string_args):
-    _fancy_print(SHELL_COLOR_LT_BLUE, string_format, *string_args)
+    _fancy_print(_SHELL_COLOR_LT_BLUE, string_format, *string_args)
 
 
-def main():
-    no_regex = '__no__regex__'
+_NO_REGEX_FLAG = '__no__regex__'
+
+
+def create_args_parser():
+    """ Creates the argument parser for dumpey. """
     parser = argparse.ArgumentParser(
         description='Dumpey description'
     )
-    parser.add_argument('-i', '--install', metavar='APK',
-                        help='install the apk')
-    parser.add_argument('-u', '--uninstall', metavar='PACKAGE',
-                        help='uninstall the package')
-    parser.add_argument('-a', '--apk', nargs=2,
+    parser.add_argument('-i', '--install',
+                        metavar='APK',
+                        help='installs the apk')
+    parser.add_argument('-u', '--uninstall',
+                        metavar='PACKAGE',
+                        help='uninstalls the app with associated package name')
+    parser.add_argument('-a', '--apk',
+                        nargs=2,
                         metavar=('PACKAGE', 'LOCAL_DIR'),
-                        help='download the apk associated with the package')
-    parser.add_argument('-m', '--monkey', nargs='+',
+                        help='''downloads the package apk to a specified
+                                local directory''')
+    parser.add_argument('-m', '--monkey',
+                        nargs='+',
                         metavar=('PACKAGE', 'ARGS'),
-                        help='runs monkey')
-    parser.add_argument('-e', '--heapdump', nargs=2,
-                        metavar=('PACKAGE', 'LOCAL'),
-                        help='dumps heap')
-    parser.add_argument('-l', '--list', nargs='?', const=no_regex,
+                        help='''runs the monkey on the given package name.
+                                Accepts four additional arguments:
+                                "s=(int)" denoting seed value, "e=(int)",
+                                denoting number of events, "h=(b|a|ba)",
+                                denoting heap dumps done before, after or
+                                before and after monkey execution and "d=(dir)",
+                                specifying the local directory where heap dumps
+                                are downloaded to. All arguments are optional,
+                                but specifying "h" requires "d" to be
+                                given too.''')
+    parser.add_argument('-e', '--heapdump',
+                        nargs=2,
+                        metavar=('PACKAGE', 'LOCAL_DIR'),
+                        help='''downloads and converts a heap dump from
+                                the given package.''')
+    parser.add_argument('-l', '--list',
+                        nargs='?',
                         metavar='REGEX',
-                        help='prints installed packages, '
-                             'Filtered by the regex, if given.')
-    parser.add_argument('-d', '--devices', nargs='+', metavar='SERIAL',
-                        help='devices to execute on. '
-                             'If not given, all attached devices will be used.')
+                        const=_NO_REGEX_FLAG,
+                        help='''prints the installed packages,
+                                filtered by the regex, if specified.''')
+    parser.add_argument('-d', '--devices',
+                        nargs='+',
+                        metavar='SERIAL',
+                        help='''devices to run this command on.
+                                If missing, all attached devices
+                                will be used.''')
+    return parser
+
+
+# TODO: maybe there's an easier way to do this with argparse
+def handle_monkey(package, args, devices):
+    """ Parses the additional monkey params, if any, and executes it."""
+    if not args:
+        monkey(package, devices)
+        return
+
+    try:
+        args_dict = dict(a.strip().split('=') for a in args)
+    except ValueError as e:
+        raise type(e)('ensure monkey params are properly set, for example: '
+                      '-m your.package.name s=(int) e=(int) d=(b|a|ba) d=(dir)')
+    s = args_dict.get('s')
+    e = args_dict.get('e')
+    h = args_dict.get('h')
+    d = args_dict.get('d')
+
+    try:
+        seed = int(s) if s else None
+        events = int(e) if e else None
+    except ValueError as e:
+        raise type(e)('s and e monkey params only accept integer values.')
+
+    before = None
+    after = None
+    if h:
+        if not d:
+            raise Exception('local directory for monkey heap dumps missing, '
+                            'add "d=(path)" param')
+        if 'b' in h:
+            before = lambda pkg, dev: dump_heap_on_single_device(pkg, d,
+                                                                 dev, 'before')
+        if 'a' in h:
+            after = lambda pkg, dev: dump_heap_on_single_device(pkg, d,
+                                                                dev, 'after')
+    monkey(package, devices,
+           seed=seed, events=events, before=before, after=after)
+
+
+def main():
+    parser = create_args_parser()
     args = parser.parse_args()
-
-    print args
-
     devices = args.devices if args.devices else attached_devices()
     if args.install:
         install(args.install, devices)
@@ -269,42 +342,15 @@ def main():
     if args.apk:
         pull_apk(args.apk[0], args.apk[1], devices)
     if args.monkey:
-        print args.monkey
+        handle_monkey(args.monkey[0], args.monkey[1:], devices)
     if args.heapdump:
         dump_heap(args.heapdump[0], args.heapdump[1], devices)
     if args.list:
         regex = None
-        if not no_regex == args.list and args.list.strip():
+        if not _NO_REGEX_FLAG == args.list and args.list.strip():
             regex = re.compile(args.list)
         print package_list(devices, regex)
 
 
-        # try:
-        # if args.install:
-        # install(args.install, devices)
-        # if args.uninstall:
-        # uninstall(args.uninstall, devices)
-        # if args.apk:
-        # pull_apk(args.apk, devices)
-        # if args.monkey:
-        # print args.monkey
-        # if args.heapdump:
-        # package = args.heapdump[0]
-        # local = args.heapdump[1]
-        # dump_heap(package, local, devices)
-        #     if args.list:
-        #         regex = None
-        #         if not no_regex == args.list and args.list.strip():
-        #             regex = re.compile(args.list)
-        #         print package_list(regex, devices)
-        # except Exception as e:
-        #     print "Error: " + str(e)
-
-
 if __name__ == "__main__":
-    # "tslamic.github.com.delightfulhomedrawable"
-    # "/Users/tadejslamic/Development/DelightfulHomeDrawable/app/build/outputs/apk/app-debug.apk"
-    # "/Users/tadejslamic/Documents/reversed/dump.hprof"
-    # r = re.compile("tslamic")
-    # pull_apk("com.sec.android.app.launcher", "/Users/tadejslamic/Documents/reversed")
     main()
