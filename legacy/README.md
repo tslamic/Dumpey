@@ -1,42 +1,4 @@
-Dumpey is a simple Python script that helps you
-
-- download any installed APK from a device,
-- get a converted memory dump,
-- run the monkey and do memory dumps before and after it,
-- install and uninstall APKs,
-
-on all attached devices, or just the ones you specify. 
-
-### Download APK from a device
-
-To download an APK, all you have to know is the package name. 
-You don't know it, you say? Well, you're in luck because Dumpey will get it for ya'. 
-
-Suppose you want to download the Youtube APK. Run
-
-```
-dumpey.py -l youtube
-```
-
-which prints out
-
-<pre>
-Installed packages on 4df1e80e3cd26ff3:
-com.google.android.youtube
-</pre>
-
-Voila, we've got the package name. Then, it's as simple as 
- 
-```
-dumpey.py -a com.google.android.youtube
-```
- 
-If you don't know it,
-you're in luck because Dumpey will help you. 
-
-
-
-
+# Dumpey
 
 Android - or, more precisely, its debug bridge -  has a very handy tool called _the monkey_. Its purpose is to stress-test your app by generating pseudo-random user events in a repeatable manner. Sometimes, the usage is a bit clunky or unclear. Dumpey helps you
 

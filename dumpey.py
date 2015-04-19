@@ -30,6 +30,7 @@ def uninstall(package, devices):
         _fancy_info('%s uninstalled from %s', package, device)
 
 
+# FIXME local_dir can be None - then use os.getcwd()
 def pull_apk(package, local_dir, devices):
     """ Downloads the apk of a specific package. """
     if not devices:
@@ -44,6 +45,7 @@ def pull_apk(package, local_dir, devices):
         pull_apk_from_path(target_path, local_dir, device)
 
 
+# FIXME local_dir can be None - then use os.getcwd()
 def pull_apk_from_path(remote, local_dir, device):
     """ Downloads the apk from a given remote path. """
     name = _alphanum_str(device) + '_' + os.path.basename(remote)
@@ -73,6 +75,7 @@ def monkey(package, devices,
             after(package, device)
 
 
+# FIXME local_dir can be None - then use os.getcwd()
 def dump_heap(package, local_dir, devices):
     """ Creates and downloads a heap dump of a given package. """
     if not devices:
@@ -84,6 +87,7 @@ def dump_heap(package, local_dir, devices):
 _REMOTE_HEAP_DUMP_PATH = '/sdcard/_dumpey_hprof_tmp'
 
 
+# FIXME local_dir can be None - then use os.getcwd()
 def dump_heap_on_single_device(package, local_dir, device, append=None):
     """ Creates and downloads a heap dump of a given package. """
     if device is None:
@@ -139,7 +143,10 @@ def adb(args, device=None, decor=None):
 def attached_devices():
     """ Returns a list of currently attached devices. """
     device_list = adb(['devices'], decor=_decor_split)[1:]
-    return [d.split('\tdevice')[0] for d in device_list if d]
+    devices = [d.split('\tdevice')[0] for d in device_list if d]
+    if not devices:
+        raise Exception('no devices attached')
+    return devices
 
 
 def package_list(devices, regex=None):
@@ -184,9 +191,6 @@ def pid(package, device, retries=0):
                         % package, _to_str(processes))
     process_target = processes[0]
     return _split_whitespace(process_target)[1]
-
-
-# Private helpers
 
 
 def _file_size(file_path, device):
@@ -243,7 +247,7 @@ def _fancy_info(string_format, *string_args):
 _NO_REGEX_FLAG = '__no__regex__'
 
 
-def create_args_parser():
+def _create_args_parser():
     """ Creates the argument parser for dumpey. """
     parser = argparse.ArgumentParser(
         description='Dumpey description'
@@ -260,7 +264,8 @@ def create_args_parser():
                         help='''downloads the package apk to a specified
                                 local directory''')
     parser.add_argument('-m', '--monkey',
-                        nargs='+',
+                        # nargs='+',
+                        nargs=argparse.REMAINDER,
                         metavar=('PACKAGE', 'ARGS'),
                         help='''runs the monkey on the given package name.
                                 Accepts four additional arguments:
@@ -292,8 +297,22 @@ def create_args_parser():
     return parser
 
 
+def _parse_monkey(package, args, devices):
+    if not args:
+        monkey(package, devices)
+        return
+    parser = argparse.ArgumentParser(prog='-m', add_help=False)
+    parser.add_argument('-s', '--seed', type=int)
+    parser.add_argument('-e', '--events', type=int)
+    parser.add_argument('-h', '--heap', choices=['b', 'a', 'ba', 'ab'])
+    parser.add_argument('-d', '--dir', type=argparse.FileType('w'))
+    monkey_args = parser.parse_args(args)
+    monkey(package, devices, monkey_args.seed, monkey_args.events,
+           monkey_args.heap, monkey_args.dir)
+
+
 # TODO: maybe there's an easier way to do this with argparse
-def handle_monkey(package, args, devices):
+def _handle_monkey(package, args, devices):
     """ Parses the additional monkey params, if any, and executes it."""
     if not args:
         monkey(package, devices)
@@ -331,8 +350,19 @@ def handle_monkey(package, args, devices):
            seed=seed, events=events, before=before, after=after)
 
 
+def _handle_list(regex_string, devices):
+    regex = None
+    if not _NO_REGEX_FLAG == regex_string and regex_string.strip():
+        regex = re.compile(regex_string)
+    packages_dict = package_list(devices, regex)
+    for device in packages_dict:
+        _fancy_info('Installed packages on %s:', device)
+        for package in packages_dict[device]:
+            print package
+
+
 def main():
-    parser = create_args_parser()
+    parser = _create_args_parser()
     args = parser.parse_args()
     devices = args.devices if args.devices else attached_devices()
     if args.install:
@@ -342,14 +372,12 @@ def main():
     if args.apk:
         pull_apk(args.apk[0], args.apk[1], devices)
     if args.monkey:
-        handle_monkey(args.monkey[0], args.monkey[1:], devices)
+        _parse_monkey(args.monkey[0], args.monkey[1:], devices)
+        # _handle_monkey(args.monkey[0], args.monkey[1:], devices)
     if args.heapdump:
         dump_heap(args.heapdump[0], args.heapdump[1], devices)
     if args.list:
-        regex = None
-        if not _NO_REGEX_FLAG == args.list and args.list.strip():
-            regex = re.compile(args.list)
-        print package_list(devices, regex)
+        _handle_list(args.list, devices)
 
 
 if __name__ == "__main__":
