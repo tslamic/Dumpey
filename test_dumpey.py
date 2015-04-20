@@ -1,22 +1,24 @@
 import unittest
 
-import dumpey as du
+import dumpey as d
 
 
-class TestStringMethods(unittest.TestCase):
+class DumpeyTest(unittest.TestCase):
     def test_decor_split(self):
+        s = ' this '
+        self.assertEqual(d._decor_split(s), ['this'])
         s = ' this\n is \n a\n   test'
-        self.assertEqual(du._decor_split(s), ['this', 'is', 'a', 'test'])
-        t = ''
-        self.assertEqual(du._decor_split(t), [])
+        self.assertEqual(d._decor_split(s), ['this', 'is', 'a', 'test'])
+        for s in ['', ' ', '   ', '\t', '\t\r', '\n']:
+            self.assertEqual(d._decor_split(s), [])
 
     def test_decor_package(self):
         s = 'package:test.package'
-        self.assertEqual(du._decor_package(s), ['test.package'])
-        t = ''
-        self.assertEqual(du._decor_package(t), [])
+        self.assertEqual(d._decor_package(s), ['test.package'])
+        for s in ['', ' ', '   ', '\t', '\t\r', '\n']:
+            self.assertEqual(d._decor_package(s), [])
 
-    def test_isupper(self):
+    def test_install(self):
         self.assertTrue('FOO'.isupper())
         self.assertFalse('Foo'.isupper())
 

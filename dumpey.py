@@ -13,45 +13,46 @@ from random import randint
 
 
 def install(apk_path, devices):
-    """ Installs the apk on all specified devices. """
+    """ Installs the apk on all given devices. """
     if not devices:
         devices = attached_devices()
     for device in devices:
         adb(['install', apk_path], device)
-        _fancy_info('%s installed on %s', apk_path, device)
+        _info('%s installed on %s', apk_path, device)
 
 
 def uninstall(package, devices):
-    """ Uninstalls the package on all specified devices. """
+    """ Uninstalls the package on all given devices. """
     if not devices:
         devices = attached_devices()
     for device in devices:
         adb(['uninstall', package], device)
-        _fancy_info('%s uninstalled from %s', package, device)
+        _info('%s uninstalled from %s', package, device)
 
 
-# FIXME local_dir can be None - then use os.getcwd()
-def pull_apk(package, local_dir, devices):
+# TODO: Not raising exception if multiple paths
+def pull_apk(package, devices, local_dir=None):
     """ Downloads the apk of a specific package. """
     if not devices:
         devices = attached_devices()
     for device in devices:
         paths = adb(['shell', 'pm', 'path', package], device, _decor_package)
         if len(paths) > 1:
-            _fancy_warning('Multiple paths available on %s: %s' % device,
-                           _to_str(paths))
+            _warning('multiple paths available on %s: %s, skipping pull',
+                     device, _to_str(paths))
             return
         target_path = paths[0]
-        pull_apk_from_path(target_path, local_dir, device)
+        _pull_apk_from_path(target_path, device, local_dir)
 
 
-# FIXME local_dir can be None - then use os.getcwd()
-def pull_apk_from_path(remote, local_dir, device):
+def _pull_apk_from_path(remote, device, local_dir=None):
     """ Downloads the apk from a given remote path. """
     name = _alphanum_str(device) + '_' + os.path.basename(remote)
+    if local_dir is None:
+        local_dir = os.getcwd()
     local_file = os.path.join(local_dir, name)
     adb(['pull', '-p', remote, local_file], device)
-    _fancy_info('Apk from %s downloaded to %s', device, local_file)
+    _info('apk from %s downloaded to %s', device, local_file)
 
 
 _MONKEY_SEED_MIN = 1000
@@ -72,44 +73,43 @@ def monkey(package, devices,
         if before:
             before(package, device)
         if log:
-            _fancy_info('Kicking off monkey (seed=%d, events=%d) on %s '
-                        'for package %s', seed, events, device, package)
+            _info('starting monkey (seed=%d, events=%d) on %s '
+                  'for package %s', seed, events, device, package)
         adb(['shell', 'monkey', '-p', package, '-s', str(seed), str(events)],
             device)
         if after:
             after(package, device)
 
 
-# FIXME local_dir can be None - then use os.getcwd()
-def dump_heap(package, local_dir, devices):
+def dump_heap(package, devices, local_dir=None):
     """ Creates and downloads a heap dump of a given package. """
     if not devices:
         devices = attached_devices()
     for device in devices:
-        dump_heap_on_single_device(package, local_dir, device)
+        _dump_heap_single_device(package, device, local_dir)
 
 
 _REMOTE_HEAP_DUMP_PATH = '/sdcard/_dumpey_hprof_tmp'
 
 
-# FIXME local_dir can be None - then use os.getcwd()
-def dump_heap_on_single_device(package, local_dir, device, append=None):
+def _dump_heap_single_device(package, device, local_dir=None, append=None):
     """ Creates and downloads a heap dump of a given package. """
-    if device is None:
-        raise Exception('no device')
     api = api_version(device)
     if api < 11:
-        _fancy_warning('Heap dumps are only available on API > 10. '
-                       'Device %s is %d' % device, api)
+        _warning('heap dumps are only available on API > 10, '
+                 'device %s is %d, skipping dump.', device, api)
         return
-    pid_num = pid(package, device)
-    remote = _REMOTE_HEAP_DUMP_PATH
-    adb(['shell', 'rm', '-f', remote], device)
-    adb(['shell', 'am', 'dumpheap', str(pid_num), remote], device)
 
-    # dumpheap runs as a daemon. We have to wait for it to
-    # finish, so check the tmp file size continuously and stop
-    # when it's not changing anymore.
+    pid_str = str(pid(package, device))
+    remote = _REMOTE_HEAP_DUMP_PATH
+
+    _rm_file(remote, device)
+    adb(['shell', 'am', 'dumpheap', pid_str, remote], device)
+
+    # dumpheap shell command runs as a daemon.
+    # We have to wait for it to finish, so check the tmp file size
+    # at timed intervals and stop when it's not changing anymore.
+    # TODO: maybe this can be done better
     size = -1
     while True:
         time.sleep(.500)
@@ -120,13 +120,18 @@ def dump_heap_on_single_device(package, local_dir, device, append=None):
 
     name = _alphanum_str(device) + '_' + _alphanum_str(package)
     if append:
-        name += '_' + append
+        # name += '_' + append
+        name = '%s_%s' % (name, append)
+    if local_dir is None:
+        local_dir = os.getcwd()
     local_file = os.path.join(local_dir, name + '.hprof')
     local_file_nonconv = local_file + '-nonconv'
+
     adb(['pull', '-p', remote, local_file_nonconv], device)
     subprocess.check_call(['hprof-conv', local_file_nonconv, local_file])
     os.remove(local_file_nonconv)
-    _fancy_info('Converted hprof file downloaded to %s', local_file)
+    _rm_file(remote, device)
+    _info('converted hprof file available at %s', local_file)
 
 
 # Helpers
@@ -158,21 +163,19 @@ def package_list(devices, regex=None):
     """ Returns a dict with install packages on each device. """
     if not devices:
         devices = attached_devices()
-    return {device: package_list_on_single_device(regex, device) for device in
+    return {device: _package_list_single_device(regex, device) for device in
             devices}
+
+
+def _package_list_single_device(regex, device):
+    """ Lists the packages conforming to the regex on a specified device. """
+    packages = adb(['shell', 'pm', 'list', 'packages'], device, _decor_package)
+    return [p for p in packages if regex.search(p)] if regex else packages
 
 
 def api_version(device):
     """ Returns the Android SDK version a given device is running. """
     return adb(['shell', 'getprop', 'ro.build.version.sdk'], device).strip()
-
-
-def package_list_on_single_device(regex, device):
-    """ Lists the packages conforming to the regex on a specified device. """
-    if device is None:
-        raise Exception('no device')
-    packages = adb(['shell', 'pm', 'list', 'packages'], device, _decor_package)
-    return [p for p in packages if regex.search(p)] if regex else packages
 
 
 def pid(package, device, retry=True):
@@ -227,23 +230,28 @@ def _to_str(lst, delimiter=', '):
     return delimiter.join(lst)
 
 
+def _rm_file(remote_path, device):
+    """ Removes the remote path from a device, if it exists. """
+    adb(['shell', 'rm', '-f', remote_path], device)
+
+
 _SHELL_COLOR_LT_BLUE = '\033[94m'
 _SHELL_COLOR_WARNING = '\033[93m'
 _SHELL_COLOR_END = '\033[0m'
 
 
-def _fancy_print(shell_color, string_format, *string_args):
+def _print(shell_color, string_format, *string_args):
     """ Prints a colored message. """
     message = string_format % string_args
     print shell_color + message + _SHELL_COLOR_END
 
 
-def _fancy_warning(string_format, *string_args):
-    _fancy_print(_SHELL_COLOR_WARNING, string_format, *string_args)
+def _warning(string_format, *string_args):
+    _print(_SHELL_COLOR_WARNING, string_format, *string_args)
 
 
-def _fancy_info(string_format, *string_args):
-    _fancy_print(_SHELL_COLOR_LT_BLUE, string_format, *string_args)
+def _info(string_format, *string_args):
+    _print(_SHELL_COLOR_LT_BLUE, string_format, *string_args)
 
 
 _NO_REGEX_FLAG = '__no__regex__'
@@ -300,7 +308,7 @@ def _create_args_parser():
     return parser
 
 
-def _parse_monkey(package, args, devices):
+def _handle_monkey(package, args, devices):
     if args:
         parser = argparse.ArgumentParser(prog='-m', add_help=False)
         parser.add_argument('-s', '--seed', type=int)
@@ -308,8 +316,19 @@ def _parse_monkey(package, args, devices):
         parser.add_argument('-h', '--heap', choices=['b', 'a', 'ba', 'ab'])
         parser.add_argument('-d', '--dir', type=argparse.FileType('w'))
         monkey_args = parser.parse_args(args)
-        monkey(package, devices, monkey_args.seed, monkey_args.events,
-               monkey_args.heap, monkey_args.dir)
+        print monkey_args
+
+        before = after = None
+        if monkey_args.heap:
+            local_dir = monkey_args.dir if monkey_args.dir else os.getcwd()
+            if 'b' in monkey_args.heap:
+                before = lambda p, d: _dump_heap_single_device(p, d, local_dir,
+                                                               'before')
+            if 'a' in monkey_args.heap:
+                after = lambda p, d: _dump_heap_single_device(p, d, local_dir,
+                                                              'after')
+        monkey(package, devices,
+               monkey_args.seed, monkey_args.events, before, after)
     else:
         monkey(package, devices)
 
@@ -320,7 +339,7 @@ def _handle_list(regex_string, devices):
         regex = re.compile(regex_string)
     packages_dict = package_list(devices, regex)
     for device in packages_dict:
-        _fancy_info('Installed packages on %s:', device)
+        _info('installed packages on %s:', device)
         for package in packages_dict[device]:
             print package
 
@@ -329,7 +348,7 @@ def main():
     parser = _create_args_parser()
     args = parser.parse_args()
     devices = args.devices if args.devices else attached_devices()
-    
+
     if args.install:
         install(args.install, devices)
     if args.uninstall:
@@ -337,7 +356,7 @@ def main():
     if args.apk:
         pull_apk(args.apk[0], args.apk[1], devices)
     if args.monkey:
-        _parse_monkey(args.monkey[0], args.monkey[1:], devices)
+        _handle_monkey(args.monkey[0], args.monkey[1:], devices)
     if args.heapdump:
         dump_heap(args.heapdump[0], args.heapdump[1], devices)
     if args.list:
