@@ -54,15 +54,20 @@ def pull_apk_from_path(remote, local_dir, device):
     _fancy_info('Apk from %s downloaded to %s', device, local_file)
 
 
+_MONKEY_SEED_MIN = 1000
+_MONKEY_SEED_MAX = 10000
+_MONKEY_EVENTS = 1000
+
+
 def monkey(package, devices,
            seed=None, events=None, before=None, after=None, log=True):
     """ Runs the monkey stress test. """
     if not devices:
         devices = attached_devices()
     if seed is None:
-        seed = randint(1000, 10000)
+        seed = randint(_MONKEY_SEED_MIN, _MONKEY_SEED_MAX)
     if events is None:
-        events = 1000
+        events = _MONKEY_EVENTS
     for device in devices:
         if before:
             before(package, device)
@@ -170,22 +175,19 @@ def package_list_on_single_device(regex, device):
     return [p for p in packages if regex.search(p)] if regex else packages
 
 
-_MAX_PID_RETRIES = 3
-
-
-def pid(package, device, retries=0):
+def pid(package, device, retry=True):
     """ Returns the package process ID on a specified device. """
     out = adb(['shell', 'ps'], device, _decor_split)
     processes = [p.strip() for p in out if package in p]
     if not processes:
         # The app might be installed, but is not running.
-        # To avoid manual start, try to run the monkey with a single event,
+        # To avoid manual work, run the monkey with a single event,
         # then re-query.
-        if retries >= _MAX_PID_RETRIES:
-            raise Exception('No process on %s found for %s. '
-                            'Is your app installed?' % (device, package))
-        monkey(package, [device], seed=0, events=1, log=False)
-        return pid(package, device, retries + 1)
+        if retry:
+            monkey(package, [device], seed=0, events=1, log=False)
+            return pid(package, device, retry=False)
+        raise Exception('No process on %s found for %s. '
+                        'Is your app installed?' % (device, package))
     if len(processes) > 1:
         raise Exception('Multiple processes for %s: %s.'
                         % package, _to_str(processes))
@@ -208,7 +210,7 @@ def _decor_split(output, cleanup=None):
 
 
 def _decor_package(output):
-    """ Splits the output into lines and removes package: delimiter """
+    """ Splits the output into lines and removes 'package:' substring """
     return _decor_split(output, lambda l: l.strip().split('package:')[1])
 
 
@@ -248,10 +250,12 @@ _NO_REGEX_FLAG = '__no__regex__'
 
 
 def _create_args_parser():
-    """ Creates the argument parser for dumpey. """
+    """ Creates the argument parser for Dumpey. """
     parser = argparse.ArgumentParser(
-        description='Dumpey description'
-    )
+        description=''' Dumpey helps you download any installed APK from a
+                        device, download a converted memory dump, run the monkey
+                        with memory dumps before and after it and install and
+                        uninstall APKs from multiple attached devices.''')
     parser.add_argument('-i', '--install',
                         metavar='APK',
                         help='installs the apk')
@@ -259,17 +263,16 @@ def _create_args_parser():
                         metavar='PACKAGE',
                         help='uninstalls the app with associated package name')
     parser.add_argument('-a', '--apk',
-                        nargs=2,
+                        nargs='+',
                         metavar=('PACKAGE', 'LOCAL_DIR'),
                         help='''downloads the package apk to a specified
-                                local directory''')
+                                local directory or current working directory''')
     parser.add_argument('-m', '--monkey',
-                        # nargs='+',
                         nargs=argparse.REMAINDER,
                         metavar=('PACKAGE', 'ARGS'),
                         help='''runs the monkey on the given package name.
                                 Accepts four additional arguments:
-                                "s=(int)" denoting seed value, "e=(int)",
+                                "-s=(int)" denoting seed value, "e=(int)",
                                 denoting number of events, "h=(b|a|ba)",
                                 denoting heap dumps done before, after or
                                 before and after monkey execution and "d=(dir)",
@@ -298,56 +301,17 @@ def _create_args_parser():
 
 
 def _parse_monkey(package, args, devices):
-    if not args:
+    if args:
+        parser = argparse.ArgumentParser(prog='-m', add_help=False)
+        parser.add_argument('-s', '--seed', type=int)
+        parser.add_argument('-e', '--events', type=int)
+        parser.add_argument('-h', '--heap', choices=['b', 'a', 'ba', 'ab'])
+        parser.add_argument('-d', '--dir', type=argparse.FileType('w'))
+        monkey_args = parser.parse_args(args)
+        monkey(package, devices, monkey_args.seed, monkey_args.events,
+               monkey_args.heap, monkey_args.dir)
+    else:
         monkey(package, devices)
-        return
-    parser = argparse.ArgumentParser(prog='-m', add_help=False)
-    parser.add_argument('-s', '--seed', type=int)
-    parser.add_argument('-e', '--events', type=int)
-    parser.add_argument('-h', '--heap', choices=['b', 'a', 'ba', 'ab'])
-    parser.add_argument('-d', '--dir', type=argparse.FileType('w'))
-    monkey_args = parser.parse_args(args)
-    monkey(package, devices, monkey_args.seed, monkey_args.events,
-           monkey_args.heap, monkey_args.dir)
-
-
-# TODO: maybe there's an easier way to do this with argparse
-def _handle_monkey(package, args, devices):
-    """ Parses the additional monkey params, if any, and executes it."""
-    if not args:
-        monkey(package, devices)
-        return
-
-    try:
-        args_dict = dict(a.strip().split('=') for a in args)
-    except ValueError as e:
-        raise type(e)('ensure monkey params are properly set, for example: '
-                      '-m your.package.name s=(int) e=(int) d=(b|a|ba) d=(dir)')
-    s = args_dict.get('s')
-    e = args_dict.get('e')
-    h = args_dict.get('h')
-    d = args_dict.get('d')
-
-    try:
-        seed = int(s) if s else None
-        events = int(e) if e else None
-    except ValueError as e:
-        raise type(e)('s and e monkey params only accept integer values.')
-
-    before = None
-    after = None
-    if h:
-        if not d:
-            raise Exception('local directory for monkey heap dumps missing, '
-                            'add "d=(path)" param')
-        if 'b' in h:
-            before = lambda pkg, dev: dump_heap_on_single_device(pkg, d,
-                                                                 dev, 'before')
-        if 'a' in h:
-            after = lambda pkg, dev: dump_heap_on_single_device(pkg, d,
-                                                                dev, 'after')
-    monkey(package, devices,
-           seed=seed, events=events, before=before, after=after)
 
 
 def _handle_list(regex_string, devices):
@@ -365,6 +329,7 @@ def main():
     parser = _create_args_parser()
     args = parser.parse_args()
     devices = args.devices if args.devices else attached_devices()
+    
     if args.install:
         install(args.install, devices)
     if args.uninstall:
@@ -373,7 +338,6 @@ def main():
         pull_apk(args.apk[0], args.apk[1], devices)
     if args.monkey:
         _parse_monkey(args.monkey[0], args.monkey[1:], devices)
-        # _handle_monkey(args.monkey[0], args.monkey[1:], devices)
     if args.heapdump:
         dump_heap(args.heapdump[0], args.heapdump[1], devices)
     if args.list:
