@@ -3,7 +3,7 @@ import subprocess
 
 import mock
 
-import dumpey
+from dumpey import dumpey
 
 
 @mock.patch('subprocess.Popen.communicate')

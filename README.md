@@ -1,151 +1,99 @@
-Dumpey is a simple Python script that helps you
+Dumpey is a simple Python script that can
 
-- download any installed APK from a device,
-- get a converted memory dump,
-- run the monkey and do memory dumps before and after it,
-- install and uninstall APKs,
+ - download any installed APK from a device
+ - extract a converted memory dump
+ - run the monkey stress test AND extract memory dumps before and after it
+ - install and uninstall packages
 
-on all attached devices, or just the ones you specify. 
+on all attached devices, or just the ones you specify.
 
-### Download APK from a device
+### How to cherry pick devices?
 
-To download an APK, all you have to know is the package name. 
-You don't know it, you say? Well, you're in luck because Dumpey will get it for ya'. 
-
-Suppose you want to download the Youtube APK. Run
-
-```
-dumpey.py -l youtube
-```
-
-which prints out
-
-<pre>
-Installed packages on 4df1e80e3cd26ff3:
-com.google.android.youtube
-</pre>
-
-Voila, we've got the package name. Then, it's as simple as 
- 
-```
-dumpey.py -a com.google.android.youtube
-```
- 
-If you don't know it,
-you're in luck because Dumpey will help you. 
-
-
-
-
-
-Android - or, more precisely, its debug bridge -  has a very handy tool called _the monkey_. Its purpose is to stress-test your app by generating pseudo-random user events in a repeatable manner. Sometimes, the usage is a bit clunky or unclear. Dumpey helps you
-
-- run the monkey on multiple devices or emulators and
-- make converted memory heap dumps before and after it
-
-Dumpey is, currently, a collection of three *UNIX* scripts:
-
- - `monkey` capable of running the monkey on all attached devices/emulators
- - `memdmp` capable of extracting and converting heap dumps from a device/emulator to a local drive
- - `dumpey` capable of extracting and converting heap dumps before and after running the monkey, on all attached devices/emulators
-
-### monkey
-
-Three options: `p`, `s` and `e`:
-
- - `-p` denotes the package name and is *required*.
- - `-s` is the seed value. If missing, a random generated number will be used instead. 
- - `-e` is the number of events you wish to generate. It defaults to 1000.
-
-Running it is as simple as:
+The `-d` flag is what you’re after. No flag in your commands means **all** 
+attached devices will be used. If you wish to execute dumpey on your favourite 
+device with a serial `OMG_FAV_DEVICE`, this does the job:
 
 ```
-$ ./monkey.sh -p your.package.name
+$ dumpey <command> -d OMG_FAV_DEVICE
 ```
 
-or as complicated as 
+To add a few other devices, say `DEVICE_1`, `DEVICE_2` and `DEVICE_3`, 
+the command is:
 
 ```
-$ ./monkey.sh -p your.package.name -s 12345 -e 5000
+$ dumpey <command> -d OMG_FAV_DEVICE DEVICE_1 DEVICE_2 DEVICE_3
 ```
 
-### memdmp
+### Download an APK
 
-Three options, all required:
-
- - `-p` denotes the package name.
- - `-s` is the device/emulator serial number.
- - `-f` is the memory dump destination file. If it doesn't exist, it will be created.
-
-An example:
+Let’s try and download the Youtube APK, installed on any decent Android device. 
+If you don’t already know the package name, you’ll have to find it. Easy peasy:
 
 ```
-$ ./memdmp.sh -s SH48HWM03500 -p your.package.name -f heapdumps/my_heap_dump.hprof
+$ dumpey -l youtube
+$ Installed packages on 4df1e80e3cd26ff3: 
+$ com.google.android.youtube
 ```
 
-This will extract a converted memory heap dump to `heapdumps/my_heap_dump.hprof` file. All you have to do is open it with MAT.
-
-### dumpey
-
-6 options this time:
-
- - `-p` denotes the package name and is required.
- - `-s` is the seed value. If missing, a random generated number will be used instead. 
- - `-e` is the number of events you wish to generate. It defaults to 10000.
- - `-b` will triger memory dumps before the monkey.
- - `-a` will triger memory dumps after the monkey.
- - `-d` denotes the directory where dumps will be put. Required if either `b` or `a` (or both) is set.
-
-Also, it expects the _memdmp_ script to be in the same directory. 
-
-Usage remains simple. To do no memory dumps whatsoever and to behave exactly the same as the _monkey_ script, do:
+Then use the package name to download the APK:
 
 ```
-$ ./dumpey.sh -p your.package.name
-```
+$ dumpey -a com.google.android.youtube
+$ Transferred 1 of 1
+$ downloaded to …
+``
 
-To add memory dumps before doing the monkey, do:
-
-```
-$ ./dumpey.sh -p your.package.name -b -d heapdumps/
-```
-
-The converted memory dump will be put in the `heapdumps` directory. If, for example, one of your attached devices is `SH48HWM03500`, the memory dump file from it will be named `SH48HWM03500-before.hprof`. 
-
-To only do memory dumps after the monkey, change `-b` to `-a`:
+Done! If you want the APK to be downloaded to a specific directory do:
 
 ```
-$ ./dumpey.sh -p your.package.name -a -d heapdumps/
+$ dumpey -a com.google.android.youtube /path/to/the/desired/dir
 ```
 
-As you can imagine, the output file will be named `SH48HWM03500-after.hprof`, and will reside in the `heapdumps` directory.
+### Extract a converted memory dump
 
-Finally, to do dumps before and after, and to shorten the syntax, do:
+Want to pull a Youtube memory dump you can view in MAT? Execute
 
 ```
-$ ./dumpey.sh -p your.package.name -bad heapdumps/
+$ dumpey -e com.google.android.youtube
 ```
+
+Want it in a specific directory? Simple: 
+
+```
+$ dumpey -e com.google.android.youtube /path/to/the/desired/dir
+```
+
+### Monkeying around
+
+For a simple stress test, this’ll do:
+
+```
+$ dumpey -m com.google.android.youtube
+```
+
+Optional flags include:
+
+- `-s` : seed value (integer)
+- `-e` : number of events (integer)
+- `-h` : heap dumps: use `b` to do a dump before monkey, `a` to do a dump after monkey, or `ab` or `ba` to do it before and afer
+- `-d` : directory to put the dumps in. By default they go into your current working directory. 
+
+
+### Install and uninstall packages
+
+The name itself tells the story. To install do
+
+```
+$ dumpey -i /path/to/my/apk
+```
+
+and to uninstall:
+
+```
+$ dumpey -u com.google.android.youtube
+```
+
+### Have a suggestion, a fix, a complaint, a new implemented feature?
+Open an issue, or better yet, create a pull request! 
 
 ### License
-
-	The MIT License (MIT)
-	
-	Copyright (c) 2015 Tadej Slamic
-	
-	Permission is hereby granted, free of charge, to any person obtaining a copy
-	of this software and associated documentation files (the "Software"), to deal
-	in the Software without restriction, including without limitation the rights
-	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-	copies of the Software, and to permit persons to whom the Software is
-	furnished to do so, subject to the following conditions:
-	
-	The above copyright notice and this permission notice shall be included in all
-	copies or substantial portions of the Software.
-	
-	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-	SOFTWARE.

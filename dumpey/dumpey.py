@@ -1,5 +1,13 @@
+#!/usr/bin/env python
+
 """
-Dumpey
+Dumpey is an Android Debug Bridge wrapper that helps you
+
+* download any installed APK from a device
+* extract a converted memory dump
+* run the monkey stress test AND extract memory dumps before and after it
+* install and uninstall packages
+
 """
 
 __version__ = '1.0.0'
@@ -9,7 +17,7 @@ import re
 import time
 import subprocess
 import argparse
-from random import randint
+import random
 
 
 _MONKEY_SEED_MIN = 1000
@@ -116,7 +124,7 @@ class Dumpey(object):
         if devices is None:
             devices = self.attached_devices()
         if seed is None:
-            seed = randint(_MONKEY_SEED_MIN, _MONKEY_SEED_MAX)
+            seed = random.randint(_MONKEY_SEED_MIN, _MONKEY_SEED_MAX)
         if events is None:
             events = _MONKEY_EVENTS
         for device in devices:
@@ -136,10 +144,12 @@ class Dumpey(object):
         """
         if devices is None:
             devices = self.attached_devices()
+        if local_dir is None:
+            local_dir = os.getcwd()
         for device in devices:
             self._dump_heap(package, device, local_dir)
 
-    def _dump_heap(self, package, device, local_dir=None, append=None):
+    def _dump_heap(self, package, device, local_dir, append=None):
         api = self.api_version(device, converter=int)
         if api < 11:
             _warn('heap dumps are only available on API > 10, device %s is %d',
@@ -166,10 +176,7 @@ class Dumpey(object):
 
         name = _alphanum_str(device) + '_' + _alphanum_str(package)
         if append:
-            # name += '_' + append
             name = '%s_%s' % (name, append)
-        if local_dir is None:
-            local_dir = os.getcwd()
         local_file = os.path.join(local_dir, name + '.hprof')
         local_file_nonconv = local_file + '-nonconv'
 
@@ -209,18 +216,18 @@ class Dumpey(object):
                 return self.pid(package, device, retry=False)
             raise Exception('no process on %s found for %s, is your app '
                             'installed?' % (device, package))
-        if len(processes) > 1:
+        elif len(processes) > 1:
             raise Exception('Multiple processes for %s: %s.'
                             % package, _to_str(processes))
         return _split_whitespace(processes[0])[1]
 
-    def file_size(self, file_path, device):
+    def file_size(self, remote_path, device):
         """
         Returns the size of a file on a given device.
         """
-        out = self.adb(['shell', 'ls', '-l', file_path], device)
-        if out.startswith(file_path):
-            raise Exception('%s not found' % file_path)
+        out = self.adb(['shell', 'ls', '-l', remote_path], device)
+        if out.startswith(remote_path):
+            raise Exception('%s not found' % remote_path)
         return _split_whitespace(out)[3]
 
     def remove_file(self, remote_path, device):
@@ -268,7 +275,7 @@ def _inform(string_format, *string_args):
     _print(_SHELL_COLOR_LT_BLUE, string_format, *string_args)
 
 
-def _create_args_parser():
+def _dumpey_args_parser():
     parser = argparse.ArgumentParser(
         description=''' Dumpey helps you download any installed APK from a
                         device, download a converted memory dump, run the monkey
@@ -345,7 +352,7 @@ def _handle_monkey(dumpey, package, args, devices):
 def _handle_list(dumpey, regex_string, devices):
     regex = None
     if not _NO_REGEX_FLAG == regex_string and regex_string.strip():
-        regex = re.compile(regex_string)
+        regex = regex_string
     packages_dict = dumpey.package_list(devices, regex)
     for device in packages_dict:
         _inform('installed packages on %s:', device)
@@ -354,7 +361,7 @@ def _handle_list(dumpey, regex_string, devices):
 
 
 def main():
-    parser = _create_args_parser()
+    parser = _dumpey_args_parser()
     args = parser.parse_args()
 
     dumpey = Dumpey()
