@@ -4,6 +4,7 @@ setup(
     name='dumpey',
     version='1.0.0',
     packages=['dumpey', 'dumpey.test'],
+    install_requires=['mock'],
     url='https://github.com/tslamic/Dumpey',
     license='MIT',
     author='Tadej Slamic',
