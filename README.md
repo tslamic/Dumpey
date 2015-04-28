@@ -1,99 +1,99 @@
-Dumpey is a simple Python script that can
+Dumpey is a simple Python script that helps you
 
- - download any installed APK from a device
- - extract a converted memory dump
+ - get any installed APK
+ - stop and clear data of any package
+ - do a converted memory dump
+ - create a series of snapshots
  - run the monkey stress test AND extract memory dumps before and after it
- - install and uninstall packages
+ - install and uninstall multiple packages
+ - list installed packages
 
-on all attached devices, or just the ones you specify.
+on all attached devices, or just the ones you specify. 
 
-### How to cherry pick devices?
+Most commands can be executed with a **package name** or a **regex string**. If a command is executed with a regex and multiple packages match, Dumpey will tell you about them, but won't do anything. 
+To allow Dumpey to act on all matching packages, a `-f` or `--force` flag is required.
 
-The `-d` flag is what you’re after. No flag in your commands means **all** 
-attached devices will be used. If you wish to execute dumpey on your favourite 
-device with a serial `OMG_FAV_DEVICE`, this does the job:
-
+To cherry pick devices, specify the serials with a `-s` or `--serials` flag: 
 ```
-$ dumpey <command> -d OMG_FAV_DEVICE
-```
-
-To add a few other devices, say `DEVICE_1`, `DEVICE_2` and `DEVICE_3`, 
-the command is:
-
-```
-$ dumpey <command> -d OMG_FAV_DEVICE DEVICE_1 DEVICE_2 DEVICE_3
+<dumpey-command> -s 32041cce74b52267
 ```
 
-### Download an APK
-
-Let’s try and download the Youtube APK, installed on any decent Android device. 
-If you don’t already know the package name, you’ll have to find it. Easy peasy:
+### Examples
 
 ```
-$ dumpey -l youtube
-$ Installed packages on 4df1e80e3cd26ff3: 
-$ com.google.android.youtube
+$ dumpey a -r youtube
 ```
 
-Then use the package name to download the APK:
+will download the Youtube APK to your current working directory. Command `a` downloads APKs. Flag `-r` denotes a regex string.
 
 ```
-$ dumpey -a com.google.android.youtube
-$ Transferred 1 of 1
-$ downloaded to …
-``
-
-Done! If you want the APK to be downloaded to a specific directory do:
-
-```
-$ dumpey -a com.google.android.youtube /path/to/the/desired/dir
+$ dumpey i /path/to/multiple/apks/dir
 ```
 
-### Extract a converted memory dump
-
-Want to pull a Youtube memory dump you can view in MAT? Execute
+will install every APK it'll find in the specified directory. Command `i` installs APKs from given directories. You can use flag `-r` or `--recursive` and Dumpey will install every apk from subdirectories, too.
 
 ```
-$ dumpey -e com.google.android.youtube
+$ dumpey h -r youtube 
 ```
+will create a converted hprof file in your current working directory. The file contains a heap dump from the Youtube app. Just open it with MAT.
 
-Want it in a specific directory? Simple: 
-
-```
-$ dumpey -e com.google.android.youtube /path/to/the/desired/dir
-```
-
-### Monkeying around
-
-For a simple stress test, this’ll do:
 
 ```
-$ dumpey -m com.google.android.youtube
+$ dumpey u com.package.example
 ```
 
-Optional flags include:
-
-- `-s` : seed value (integer)
-- `-e` : number of events (integer)
-- `-h` : heap dumps: use `b` to do a dump before monkey, `a` to do a dump after monkey, or `ab` or `ba` to do it before and afer
-- `-d` : directory to put the dumps in. By default they go into your current working directory. 
-
-
-### Install and uninstall packages
-
-The name itself tells the story. To install do
+will uninstall the com.package.example from all attached devices.
 
 ```
-$ dumpey -i /path/to/my/apk
+$ dumpey r -s 32041cce74b52267
 ```
 
-and to uninstall:
+will reboot the device with serial number 32041cce74b52267. 
 
 ```
-$ dumpey -u com.google.android.youtube
+$ dumpey m com.package.example --dump ba
 ```
 
-### Have a suggestion, a fix, a complaint, a new implemented feature?
-Open an issue, or better yet, create a pull request! 
+will create a hprof file with a memory dump from com.package.example. It'll then do a monkey stress test. After monkey is done, another hprof file with a memory dump after the monkey is created. All you have to do is open them in MAT and compare. `ba` denotes **b**efore and **a**fter 
+
+### But wait, there's more!
+
+Here's the list of all Dumpey commands: 
+
+```
+usage: dumpey.py [-h] {i,u,a,c,r,h,l,m,s} ...
+
+Dumpey, an Android Debug Bridge utility tool.
+
+optional arguments:
+  -h, --help           show this help message and exit
+
+dumpey commands:
+  {i,u,a,c,r,h,l,m,s}  commands
+    i                  install APKs from path
+    u                  uninstall apps
+    a                  download APKs
+    c                  stop and clear package data
+    r                  reboot devices
+    h                  do a heap dump
+    l                  list installed packages
+    m                  run the monkey
+    s                  make snapshot
+```
+
+each command accepts a `-h` or `--help` flag which'll tell you the various ways to use Dumpey.
+
+Dumpey can also serve as a library, since it enables you to interact with the ADB, with some of the plumbing taken care of. 
+
+### Install
+
+`pip install dumpey`
+
+
+### Have a suggestion, a fix, a complaint or a feature request?
+
+Open an issue, or better yet, create a pull request!
 
 ### License
+
+Apache 2.0
