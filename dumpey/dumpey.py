@@ -12,7 +12,7 @@ Dumpey is an Android Debug Bridge utility tool. It helps you
 on all attached devices, or the ones you specify.
 """
 
-__version__ = '1.0.0'
+__version__ = '0.9.0'
 
 import subprocess
 import argparse
@@ -215,19 +215,6 @@ def monkey(package=None, regex=None, devices=None, seed=None, events=None,
                       after, log)
 
 
-def _monkey(package, device, seed, events, before, after, log):
-    if before:
-        before(package, device)
-    if log:
-        _inform('starting monkey (seed=%d, events=%d) on %s '
-                'for package %s', seed, events, device, package)
-    s = str(seed)
-    e = str(events)
-    adb(['shell', 'monkey', '-p', package, '-s', s, e], device)
-    if after:
-        after(package, device)
-
-
 def package_list(devices=None, regex=None):
     """
     Return a dict of installed packages on given devices, filtered by
@@ -268,8 +255,7 @@ def pid(package, device, force_open=True):
         if force_open:
             # The app might be installed, but is not running. Exec the monkey
             # with a single event, then re-query.
-            monkey(package=package, devices=[device], seed=0, events=1,
-                   log=False)
+            _monkey(package, device, 0, 1, None, None, False)
             return pid(package, device, force_open=False)
         raise Exception('no process on %s found for %s, is your app '
                         'installed?' % (device, package))
@@ -435,7 +421,7 @@ def _uninstall_package(package, device):
     _inform('%s uninstalled from %s', package, device)
 
 
-def _package_iter(regex, devices, f, force=False, *args):
+def _package_iter(regex, devices, func, force=False, *args):
     affected_devices = []
     compiled_regex = re.compile(regex)
     for device in devices:
@@ -448,10 +434,12 @@ def _package_iter(regex, devices, f, force=False, *args):
         else:
             affected_devices.append(device)
             for package in packages:
-                f(package, device, *args)
+                func(package, device, *args)
     return affected_devices
 
 
+# No force option here - intuitively, it seems paths should always include a
+# sole element. Since I'm not 100% sure, I'm leaving the checks in.
 def _pull_apk(package, device, local_dir):
     paths = adb(['shell', 'pm', 'path', package], device, _decor_package)
     if not paths:
@@ -465,6 +453,17 @@ def _pull_apk(package, device, local_dir):
         pull(path, local, device)
         _inform('apk from %s downloaded to %s', device, local)
 
+
+def _monkey(package, device, seed, events, before, after, log):
+    if before is not None:
+        before(package, device)
+    if log:
+        _inform('starting monkey (seed=%d, events=%d) on %s '
+                'for package %s', seed, events, device, package)
+    command = ['shell', 'monkey', '-p', package, '-s', str(seed), str(events)]
+    adb(command, device)
+    if after is not None:
+        after(package, device)
 
 # Path where a screenshot is temporarily saved on a device
 _REMOTE_SCREENSHOT_PATH = '/sdcard/_dumpey_screenshot_tmp.png'

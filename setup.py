@@ -2,13 +2,11 @@ from distutils.core import setup
 
 setup(
     name='dumpey',
-    version='1.0.0',
-    packages=['dumpey', 'dumpey.test'],
-    install_requires=['mock'],
+    version='0.9.0',
+    packages=['dumpey'],
     url='https://github.com/tslamic/Dumpey',
     license='MIT',
     author='Tadej Slamic',
-    author_email='sljamca@yahoo.com',
-    description='Android Debug Bridge wrapper',
-    keywords="python android adb dumpey",
+    description='Android Debug Bridge utility tool',
+    keywords="android adb dumpey",
 )
