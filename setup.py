@@ -1,4 +1,4 @@
-from distutils.core import setup
+from setuptools import setup
 
 setup(
     name='dumpey',
@@ -8,5 +8,11 @@ setup(
     license='MIT',
     author='Tadej Slamic',
     description='Android Debug Bridge utility tool',
-    keywords="android adb dumpey",
+    keywords=['android', 'adb', 'utility', 'dumpey'],
+    test_suite='tests',
+    classifiers=[
+        "Development Status :: 4 - Beta",
+        "Topic :: Utilities",
+        "License :: OSI Approved :: MIT License",
+    ],
 )

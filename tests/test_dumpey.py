@@ -1,5 +1,6 @@
 import unittest
 import subprocess
+import re
 
 import mock
 
@@ -191,8 +192,6 @@ class DumpeyTest(unittest.TestCase):
                                ['adb', '-s', device, "shell", "pm", "clear",
                                 package])
 
-    # MISSING TEST DUMP HEAP
-
     def test_split_whitespace(self, popen_mock):
         fst = "a b  c   d    e     f      g       h"
         snd = "a       b      c     d    e   f  g h"
@@ -223,7 +222,30 @@ class DumpeyTest(unittest.TestCase):
 
     # MISSING TEST INSTALL
 
-    # MISSING TEST PACKAGE LIST
+    # MISSING TEST UNINSTALL
+
+    def test_package_list_no_regex(self, popen_mock):
+        package = DumpeyTest.PACKAGE_1
+        raw = "\npackage:%s\n" % package
+        popen_mock.return_value = self.create_popen_mock(out=raw)
+        device = DumpeyTest.DEVICE_1
+        out = dumpey._package_list(device, None)
+        self.assertEquals([package], out)
+        self.assert_popen_mock(popen_mock, 1,
+                               ['adb', '-s', device, 'shell', 'pm', 'list',
+                                'packages'])
+
+    def test_package_list(self, popen_mock):
+        package = DumpeyTest.PACKAGE_1
+        raw = "\npackage:%s\npackage:%s\n" % (package, DumpeyTest.PACKAGE_2)
+        popen_mock.return_value = self.create_popen_mock(out=raw)
+        device = DumpeyTest.DEVICE_1
+        regex = re.compile("fst")
+        out = dumpey._package_list(device, regex)
+        self.assertEquals([package], out)
+        self.assert_popen_mock(popen_mock, 1,
+                               ['adb', '-s', device, 'shell', 'pm', 'list',
+                                'packages'])
 
     def test_pull_progress(self, popen_mock):
         self.exec_pull(popen_mock, True)
@@ -246,8 +268,6 @@ class DumpeyTest(unittest.TestCase):
                                    ['adb', '-s', device, 'pull',
                                     remote, local])
 
-    # MISSING TEST PULL APK
-
     def test_reboot(self, popen_mock):
         popen_mock.return_value = self.create_popen_mock()
         devices = DumpeyTest.DEVICES
@@ -266,19 +286,33 @@ class DumpeyTest(unittest.TestCase):
                                ['adb', '-s', device, 'shell', 'rm', '-f',
                                 remote])
 
-    # MISSING TEST SINGLE SNAPSHOT
+    @mock.patch('dumpey.dumpey.pull', autospec=True)
+    @mock.patch('dumpey.dumpey.remove_file', autospec=True)
+    def test_snapshot(self, remove_mock, pull_mock, popen_mock):
+        popen_mock.return_value = self.create_popen_mock()
+        device = DumpeyTest.DEVICE_1
+        dumpey._screenshot(device, DumpeyTest.LOCAL_DIR)
+        self.assert_popen_mock(popen_mock, 1,
+                               ['adb', '-s', device, 'shell', 'screencap',
+                                dumpey._REMOTE_SCREENSHOT_PATH])
+        self.assert_called(pull_mock, 1)
+        self.assert_called(remove_mock, 1)
 
-    # MISSING TEST SNAPSHOTS
+    @mock.patch('dumpey.dumpey.attached_devices', autospec=True)
+    def test_snapshots_raise(self, attached_mock, popen_mock):
+        attached_mock.return_value = DumpeyTest.PACKAGES
+        self.assertRaises(Exception, dumpey.snapshots)
+        self.assert_called(popen_mock, 0)
 
-    # MISSING TEST _SNAPSHOT
-
-    # MISSING TEST UNINSTALL
-
-    # MISSING TEST _CMD
-
-    # MISSING TEST INSTALL_FROM_DIR
-
-    # MISSING TEST INSTALL_FROM_FILE
+    @mock.patch('dumpey.dumpey.attached_devices', autospec=True)
+    def test_snapshots(self, attached_mock, popen_mock):
+        popen_mock.return_value = self.create_popen_mock()
+        device = DumpeyTest.DEVICE_1
+        attached_mock.return_value = [device]
+        dumpey.snapshots()
+        self.assert_popen_mock(popen_mock, 3,  # snap + pull + remove
+                               ['adb', '-s', device, 'shell', 'screencap',
+                                dumpey._REMOTE_SCREENSHOT_PATH])
 
     def test_uninstall_package(self, popen_mock):
         popen_mock.return_value = self.create_popen_mock()
@@ -287,10 +321,6 @@ class DumpeyTest(unittest.TestCase):
         dumpey._uninstall_package(package, device)
         self.assert_popen_mock(popen_mock, 1,
                                ['adb', '-s', device, 'uninstall', package])
-
-    # MISSING TEST _PULL_APK
-
-    # MISSING TEST _DUMP_HEAP
 
     def test_decor_split(self, popen_mock):
         args = ' fst\n   snd\ntrd    \nfth'
@@ -328,22 +358,19 @@ class DumpeyTest(unittest.TestCase):
                                ['adb', '-s', device, 'shell', 'pm', 'path',
                                 package])
 
-    # def test_pull_apk_ok(self, popen_mock):
-    # popen_mock.return_value = self.create_popen_mock(out='package:fst\n')
-    # package = DumpeyTest.PACKAGE_1
-    # device = DumpeyTest.DEVICE_1
-    # local_dir = DumpeyTest.LOCAL_DIR
-    #
-    # apk_name = DumpeyTest.DUMMY
-    # name = device + '_' + apk_name
-    # local_file = os.path.join(local_dir, name)
-    #
-    # dumpey._pull_apk(package, device, local_dir)
-    # self.assert_popen_mock(popen_mock, 2,
-    # ['adb', '-s', device, 'shell', 'pm', 'path',
-    # package],
-    # ['adb', '-s', device, 'pull', '-p', apk_name,
-    # local_file])
+    def test_pull_apk_ok(self, popen_mock):
+        package = DumpeyTest.PACKAGE_1
+        package_path = package + "apk_path.apk"
+        raw = 'package:%s\n' % package_path
+        popen_mock.return_value = self.create_popen_mock(out=raw)
+
+        device = DumpeyTest.DEVICE_1
+        local_dir = DumpeyTest.LOCAL_DIR
+
+        dumpey._pull_apk(package, device, local_dir)
+        self.assert_popen_mock(popen_mock, 2,  # path + pull
+                               ['adb', '-s', device, 'shell', 'pm', 'path',
+                                package])
 
     @mock.patch('dumpey.dumpey.attached_devices')
     def test_monkey(self, attached_mock, popen_mock):
@@ -384,15 +411,32 @@ class DumpeyTest(unittest.TestCase):
                                 package, '-s', str(0), str(1)],
                                ['adb', '-s', device, 'shell', 'ps'])
 
-    def test_dump_heap_bad_version(self, popen_mock):
-        popen_mock.return_value = self.create_popen_mock(out='10\r')
-        package = 'dummy.package'
-        device = 'dummy_device'
-        local_dir = 'dummy_dir'
+    @mock.patch('dumpey.dumpey.api_version', return_value=10)
+    def test_dump_heap_bad_version(self, api_mock, popen_mock):
+        package = DumpeyTest.PACKAGE_1
+        device = DumpeyTest.DEVICE_1
+        local_dir = DumpeyTest.LOCAL_DIR
         dumpey._dump_heap(package, device, local_dir)
-        self.assert_popen_mock(popen_mock, 1,
-                               ['adb', '-s', device, 'shell', 'getprop',
-                                'ro.build.version.sdk'])
+        self.assert_called(api_mock, 1)
+        self.assert_called(popen_mock, 0)
+
+    def test_to_str(self, popen_mock):
+        self.assertEquals("a_b_c", dumpey._to_str(["a", "b", "c"], "_"))
+        self.assertEquals("a_b", dumpey._to_str(["a", "b", None], "_"))
+        self.assert_called(popen_mock, 0)
+
+    def test_generate_name(self, popen_mock):
+        self.assertEquals("device_test",
+                          dumpey._generate_name("device", "test"))
+        self.assertEquals("1_device_test",
+                          dumpey._generate_name("1.device", "test"))
+        self.assertEquals("de_vice_test.png",
+                          dumpey._generate_name("de.vice", "test", "png"))
+        self.assertEquals("de_vice_a_b.png",
+                          dumpey._generate_name("de.vice", ["a", "b"], "png"))
+        self.assertEquals("a_b_c_d_e.test",
+                          dumpey._generate_name("a!b,c", ["d", "e"], "test"))
+        self.assert_called(popen_mock, 0)
 
     def create_popen_mock(self, exit_value=0, out=None, err=None):
         if out is None:

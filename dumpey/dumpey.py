@@ -1,15 +1,15 @@
 """
-Dumpey is an Android Debug Bridge utility tool. It helps you
+Dumpey is a simple Python script that helps you
 
-* download installed APKs
-* download & convert memory dumps
-* run the monkey with memory dumps before and after it
-* install and uninstall packages
-* clear data
-* take screenshots
-* reboot devices
+ - get any installed APK
+ - stop and clear data of any package
+ - do a converted memory dump
+ - create a series of snapshots
+ - run the monkey stress test AND extract memory dumps before and after it
+ - install and uninstall multiple packages
+ - list installed packages
 
-on all attached devices, or the ones you specify.
+on all attached devices, or just the ones you specify.
 """
 
 __version__ = '0.9.0'
@@ -333,7 +333,7 @@ def remove_file(remote_path, device):
     adb(['shell', 'rm', '-f', remote_path], device)
 
 
-def snapshots(device, local_dir=None, multiple=False):
+def snapshots(device=None, local_dir=None, multiple=False):
     """
     Take a snapshot of the current screen.
 
@@ -448,7 +448,7 @@ def _pull_apk(package, device, local_dir):
         _warn('multiple paths available on %s: %s', device, _to_str(paths))
     else:
         path = paths[0]
-        name = _alphanum_str(device) + '_' + os.path.basename(path)
+        name = _generate_name(device, os.path.basename(path), "apk")
         local = os.path.join(local_dir, name)
         pull(path, local, device)
         _inform('apk from %s downloaded to %s', device, local)
@@ -471,10 +471,10 @@ _REMOTE_SCREENSHOT_PATH = '/sdcard/_dumpey_screenshot_tmp.png'
 
 def _screenshot(device, local_dir):
     now = str(int(time.time()))
-    name = _alphanum_str(device) + '_' + now + '.png'
+    name = _generate_name(device, now, "png")
     local_file = os.path.join(local_dir, name)
     remote = _REMOTE_SCREENSHOT_PATH
-    adb(['shell', 'screencap', remote])
+    adb(['shell', 'screencap', remote], device)
     pull(remote, local_file, device, show_progress=False)
     remove_file(remote, device)
     _inform("screenshot downloaded to %s", local_file)
@@ -511,9 +511,7 @@ def _dump_heap(package, device, local_dir, append=None):
         size = temp
 
     # Create and pull the non-converted hprof dump.
-    name = _alphanum_str(device) + '_' + _alphanum_str(package)
-    if append:
-        name = '%s_%s' % (name, append)
+    name = _generate_name(device, [package, append])
     local_file = os.path.join(local_dir, name + '.hprof')
     local_file_nonconv = local_file + '-nonconv'
     pull(remote, local_file_nonconv, device)
@@ -545,6 +543,12 @@ def _ensure_package_or_regex_given(package, regex):
         raise Exception("either package or regex must be given")
 
 
+def _generate_name(device, item, extension=None):
+    detail = _to_str(item, "_") if type(item) is list else item
+    string = _alphanum_str(device + "_" + detail)
+    return "%s.%s" % (string, extension) if extension else string
+
+
 def _decor_split(output, cleanup=None):
     splits = output.split('\n')
     return [cleanup(s) if cleanup else s.strip() for s in splits if s.strip()]
@@ -562,8 +566,8 @@ def _alphanum_str(string):
     return re.sub(r'\W+', '_', string)
 
 
-def _to_str(lst, delimiter=', '):
-    return delimiter.join(lst)
+def _to_str(iterable, delimiter=', '):
+    return delimiter.join(filter(None, iterable))
 
 
 _SHELL_COLOR_LT_BLUE = '\033[94m'

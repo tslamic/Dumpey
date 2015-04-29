@@ -1,21 +1,21 @@
 Dumpey is a simple Python script that helps you
 
- - get any installed APK
+ - pull any installed APK
  - stop and clear data of any package
- - do a converted memory dump
+ - do a memory dump
  - create a series of snapshots
- - run the monkey stress test AND extract memory dumps before and after it
+ - run the monkey stress test and extract memory dumps before and/or after it
  - install and uninstall multiple packages
  - list installed packages
 
-on all attached devices, or just the ones you specify. 
+on all attached devices, or just the ones you specify. Most commands can be executed with a specific **package name** or a **regex**. 
 
-Most commands can be executed with a **package name** or a **regex string**. If a command is executed with a regex and multiple packages match, Dumpey will tell you about them, but won't do anything. 
-To allow Dumpey to act on all matching packages, a `-f` or `--force` flag is required.
+If a command is executed with a regex and multiple packages are found, Dumpey will warn you, but won't do anything unless you explicitly specify the `-f` or `--force` flag. To cherry pick devices, specify serials with a `-s` or `--serials` flag: 
 
-To cherry pick devices, specify the serials with a `-s` or `--serials` flag: 
+Get it with
+
 ```
-<dumpey-command> -s 32041cce74b52267
+pip install dumpey
 ```
 
 ### Examples
@@ -24,25 +24,24 @@ To cherry pick devices, specify the serials with a `-s` or `--serials` flag:
 $ dumpey a -r youtube
 ```
 
-will download the Youtube APK to your current working directory. Command `a` downloads APKs. Flag `-r` denotes a regex string.
+will download the Youtube APK to current working directory. Flag `-r` denotes a regex string.
 
 ```
-$ dumpey i /path/to/multiple/apks/dir
+$ dumpey i -o /my/dir
 ```
 
-will install every APK it'll find in the specified directory. Command `i` installs APKs from given directories. You can use flag `-r` or `--recursive` and Dumpey will install every apk from subdirectories, too.
+will install every APK it finds in the `/my/dir` directory. You can use `-r` or `--recursive` flag to install APKs from subdirectories, too.
 
 ```
 $ dumpey h -r youtube 
 ```
-will create a converted hprof file in your current working directory. The file contains a heap dump from the Youtube app. Just open it with MAT.
-
+will create a converted hprof file in your current working directory. Just open it with MAT.
 
 ```
-$ dumpey u com.package.example
+$ dumpey u -p com.google.android.youtube
 ```
 
-will uninstall the com.package.example from all attached devices.
+will uninstall the Youtube app from all attached devices.
 
 ```
 $ dumpey r -s 32041cce74b52267
@@ -51,10 +50,16 @@ $ dumpey r -s 32041cce74b52267
 will reboot the device with serial number 32041cce74b52267. 
 
 ```
-$ dumpey m com.package.example --dump ba
+$ dumpey c -f -r google
 ```
 
-will create a hprof file with a memory dump from com.package.example. It'll then do a monkey stress test. After monkey is done, another hprof file with a memory dump after the monkey is created. All you have to do is open them in MAT and compare. `ba` denotes **b**efore and **a**fter 
+will force stop and clear all the data from each package that includes a 'google' string.
+
+```
+$ dumpey m com.google.android.youtube --dump ba
+```
+
+will create a hprof file with a memory dump from the Youtube app. It'll then do a monkey stress test. After monkey is done, another hprof file with a memory dump after the monkey is created. All you have to do is open them in MAT and compare. `ba` denotes **b**efore and **a**fter 
 
 ### But wait, there's more!
 
@@ -90,10 +95,10 @@ Dumpey can also serve as a library, since it enables you to interact with the AD
 `pip install dumpey`
 
 
-### Have a suggestion, a fix, a complaint or a feature request?
+### Have a suggestion, a fix, a complaint or feature request?
 
 Open an issue, or better yet, create a pull request!
 
 ### License
 
-Apache 2.0
+MIT
