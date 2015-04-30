@@ -12,6 +12,8 @@ Dumpey is a simple Python script that helps you
 on all attached devices, or just the ones you specify.
 """
 
+__version__ = '0.8.1'
+
 import subprocess
 import argparse
 import random
@@ -19,19 +21,6 @@ import time
 import sys
 import re
 import os
-
-
-def _read_version():
-    """
-    Read VERSION file in package root.
-    """
-    path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
-    with open(os.path.join(path, 'VERSION'), 'r') as f:
-        version = f.read().strip()
-    return version
-
-
-__version__ = _read_version()
 
 
 def adb(args, device=None, decor=None):

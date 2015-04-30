@@ -3,14 +3,11 @@ from setuptools import setup, find_packages
 with open('README.rst', 'r') as f:
     long_description = f.read()
 
-with open('VERSION', 'r') as f:
-    version = f.read().strip()
-
 tests_require = ['mock']
 
 setup(
     name='dumpey',
-    version=version,
+    version='0.8.1',
     packages=find_packages(),
     url='https://github.com/tslamic/Dumpey',
     license='MIT',
