@@ -7,7 +7,7 @@ tests_require = ['mock']
 
 setup(
     name='dumpey',
-    version='0.8.1',
+    version='0.8.2',
     packages=find_packages(),
     url='https://github.com/tslamic/Dumpey',
     license='MIT',
@@ -23,7 +23,11 @@ setup(
     },
     classifiers=[
         "Development Status :: 4 - Beta",
+        'Environment :: Console',
         "Topic :: Utilities",
         "License :: OSI Approved :: MIT License",
     ],
+    entry_points={
+        'console_scripts': ['dumpey = dumpey.dumpey:_main'],
+    }
 )

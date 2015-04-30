@@ -12,7 +12,7 @@ Dumpey is a simple Python script that helps you
 on all attached devices, or just the ones you specify.
 """
 
-__version__ = '0.8.1'
+__version__ = '0.8.2'
 
 import subprocess
 import argparse
