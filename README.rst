@@ -13,6 +13,10 @@ on all attached devices, or just the ones you specify. Most commands can
 be executed with a specific **package name** or a **regex**.
 
 **Dumpey expects Android platform tools to be part of the system path.**
+**Currently supports Python 2.7 - 3.3, inclusive.**
+
+.. image:: https://travis-ci.org/tslamic/Dumpey.svg?branch=master
+    :target: https://travis-ci.org/tslamic/Dumpey
 
 If a command is executed with a regex and multiple packages are found,
 Dumpey will warn you, but won't do anything unless you explicitly
