@@ -15,6 +15,7 @@ setup(
     url='https://github.com/tslamic/Dumpey',
     license='MIT',
     author='Tadej Slamic',
+    author_email='sljamca@yahoo.com',
     description='Android Debug Bridge utility tool',
     long_description=long_description,
     keywords='android adb utility dumpey',
