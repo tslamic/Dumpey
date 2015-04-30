@@ -577,7 +577,7 @@ _SHELL_COLOR_END = '\033[0m'
 
 def _print(shell_color, string_format, *string_args):
     message = string_format % string_args
-    print shell_color + message + _SHELL_COLOR_END
+    print(shell_color + message + _SHELL_COLOR_END)
 
 
 def _warn(string_format, *string_args):
@@ -678,7 +678,7 @@ def _handle_list(regex, devices):
         else:
             _inform("installed packages on %s:", device)
         for package in packages_dict[device]:
-            print package
+            print(package)
 
 
 def _main():
@@ -708,7 +708,7 @@ def _main():
         elif 'u' == sub:
             uninstall(args.package, args.regex, args.devices, args.force)
     except Exception as e:
-        print str(e)
+        print(str(e))
 
 
 if __name__ == "__main__":
