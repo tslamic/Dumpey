@@ -1,10 +1,9 @@
-import unittest
-import subprocess
-import re
-
-import mock
-
 from dumpey import dumpey
+
+import subprocess
+import unittest
+import mock
+import re
 
 
 @mock.patch('subprocess.Popen', autospec=True)

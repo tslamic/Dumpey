@@ -12,8 +12,6 @@ Dumpey is a simple Python script that helps you
 on all attached devices, or just the ones you specify.
 """
 
-__version__ = '0.9.0'
-
 import subprocess
 import argparse
 import random
@@ -21,6 +19,19 @@ import time
 import sys
 import re
 import os
+
+
+def _read_version():
+    """
+    Read VERSION file in package root.
+    """
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    with open(os.path.join(path, 'VERSION'), 'r') as f:
+        version = f.read().strip()
+    return version
+
+
+__version__ = _read_version()
 
 
 def adb(args, device=None, decor=None):
@@ -544,7 +555,7 @@ def _ensure_package_or_regex_given(package, regex):
 
 
 def _generate_name(device, item, extension=None):
-    detail = _to_str(item, "_") if type(item) is list else item
+    detail = _to_str(item, "_") if isinstance(item, list) else item
     string = _alphanum_str(device + "_" + detail)
     return "%s.%s" % (string, extension) if extension else string
 
@@ -684,26 +695,31 @@ def _handle_list(regex, devices):
 def _main():
     parser = _dumpey_args_parser()
     args = parser.parse_args()
+
     sub = args.sub
-    if 'a' == sub:
-        pull_apk(args.package, args.regex, args.devices, args.path, args.force)
-    elif 'c' == sub:
-        clear_data(args.package, args.regex, args.devices, args.force)
-    elif 'h' == sub:
-        dump_heap(args.package, args.regex, args.devices, args.path,
-                  args.force)
-    elif 'i' == sub:
-        install(args.path, args.devices, args.recursive)
-    elif 'r' == sub:
-        reboot(args.devices)
-    elif 'l' == sub:
-        _handle_list(args.regex, args.devices)
-    elif 'm' == sub:
-        _handle_monkey(args, args.devices)
-    elif 's' == sub:
-        snapshots(args.device, args.path, args.multi)
-    elif 'u' == sub:
-        uninstall(args.package, args.regex, args.devices, args.force)
+    try:
+        if 'a' == sub:
+            pull_apk(args.package, args.regex, args.devices, args.path,
+                     args.force)
+        elif 'c' == sub:
+            clear_data(args.package, args.regex, args.devices, args.force)
+        elif 'h' == sub:
+            dump_heap(args.package, args.regex, args.devices, args.path,
+                      args.force)
+        elif 'i' == sub:
+            install(args.path, args.devices, args.recursive)
+        elif 'r' == sub:
+            reboot(args.devices)
+        elif 'l' == sub:
+            _handle_list(args.regex, args.devices)
+        elif 'm' == sub:
+            _handle_monkey(args, args.devices)
+        elif 's' == sub:
+            snapshots(args.device, args.path, args.multi)
+        elif 'u' == sub:
+            uninstall(args.package, args.regex, args.devices, args.force)
+    except Exception as e:
+        print str(e)
 
 
 if __name__ == "__main__":
