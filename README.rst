@@ -18,11 +18,6 @@ be executed with a specific **package name** or a **regex**.
 .. image:: https://travis-ci.org/tslamic/Dumpey.svg?branch=master
     :target: https://travis-ci.org/tslamic/Dumpey
 
-If a command is executed with a regex and multiple packages are found,
-Dumpey will warn you, but won't do anything unless you explicitly
-specify the ``-f`` or ``--force`` flag. To cherry pick devices, specify
-serials with a ``-s`` or ``--serials`` flag:
-
 Get it with
 
 ::
@@ -31,6 +26,11 @@ Get it with
 
 Examples
 ~~~~~~~~
+
+If a command is executed with a regex and multiple packages are found,
+Dumpey will warn you, but won't do anything unless you explicitly
+specify the ``-f`` or ``--force`` flag. To cherry pick devices, specify
+serials with a ``-s`` or ``--serials`` flag.
 
 ::
 
